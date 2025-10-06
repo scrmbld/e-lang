@@ -24,7 +24,47 @@ let rec derive_type (e : e_term) (gamma : e_type StringMap.t) : (e_type, string)
     | Len (e1) -> if (derive_type e1 gamma) = Ok T_Str then Ok T_Num else Error "malformed type"
     | Let (e1, x, e2) -> let_type e1 x e2 gamma
 
-(* TODO: cases for all of the execution rules *)
+let rec step (e : e_term) (gamma : e_term StringMap.t) : ((e_term * e_term StringMap.t), string) result =
+    let ident_x x gamma = match StringMap.find_opt x gamma with
+        | Some e -> Ok (e, gamma)
+        | None -> Error (Printf.sprintf "invalid identifier: %s" x)
+    and plus_e1 e1 e2 gamma = match step e1 gamma with
+        | Ok (e1p, gp) -> Ok (Plus (e1p, e2), gp)
+        | err -> err
+    and plus_e2 e1 e2 gamma = match step e2 gamma with
+        | Ok (e2p, gp) -> Ok (Plus (e1, e2p), gp)
+        | err -> err
+    and times_e1 e1 e2 gamma = match step e1 gamma with
+        | Ok (e1p, gp) -> Ok (Times (e1p, e2), gp)
+        | err -> err
+    and times_e2 e1 e2 gamma = match step e2 gamma with
+        | Ok (e2p, gp) -> Ok (Times (e1, e2p), gp)
+        | err -> err
+    and cat_e1 e1 e2 gamma = match step e1 gamma with
+        | Ok (e1p, gp) -> Ok (Cat (e1p, e2), gp)
+        | err -> err
+    and cat_e2 e1 e2 gamma = match step e2 gamma with
+        | Ok (e2p, gp) -> Ok (Cat (e1, e2p), gp)
+        | err -> err
+    and len_e e gamma = match step e gamma with
+        | Ok (ep, gp) -> Ok (Len (ep), gp)
+    in match e with
+        | E_Ident x -> ident_x x gamma
+        | E_Num n -> Ok ((E_Num n), gamma)
+        | E_Str s -> Ok (E_Str s, gamma)
+        | Plus (E_Num n1, E_Num n2) -> Ok (E_Num (n1 + n2), gamma)
+        | Plus (E_Num n1, e2) -> plus_e2 (E_Num n1) e2 gamma
+        | Plus (e1, e2) -> plus_e1 e1 e2 gamma
+        | Times (E_Num n1, E_Num n2) -> Ok (E_Num (n1 * n2), gamma)
+        | Times (E_Num n1, e2) -> times_e2 (E_Num n1) e2 gamma
+        | Times (e1, e2) -> times_e1 e1 e2 gamma
+        | Cat (E_Str s1, E_Str s2) -> Ok (E_Str (s1 ^ s2), gamma)
+        | Cat (E_Str s1, e2) -> cat_e2 (E_Str s1) e2 gamma
+        | Cat (e1, e2) -> cat_e1 e1 e2 gamma
+        | Len (E_Str s) -> Ok (E_Num (String.length s), gamma)
+        | Len e -> len_e e gamma
+        | Let (e1, x, e2) -> Ok (e2, (StringMap.add x e1 gamma))
+
 let rec eval (e : e_term) (gamma : e_term StringMap.t) : (e_term, string) result =
     let ident_x x gamma = match StringMap.find_opt x gamma with
         | Some e -> eval e gamma
