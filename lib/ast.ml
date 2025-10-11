@@ -10,22 +10,22 @@ type e_term =
     | E_Ident of e_ident
     | E_Num of int
     | E_Str of string
-    | Plus of (e_term * e_term)
-    | Times of (e_term * e_term)
-    | Cat of (e_term * e_term)
-    | Len of e_term
-    | Let of (e_term * e_ident * e_term)
+    | E_Plus of (e_term * e_term)
+    | E_Times of (e_term * e_term)
+    | E_Cat of (e_term * e_term)
+    | E_Len of e_term
+    | E_Let of (e_term * e_ident * e_term)
 
 (** Converts terms into strings to make ASTs and rules readable *)
 let rec string_of_e_term e = match e with
     | E_Ident x -> x
     | E_Num n -> Printf.sprintf "Num(%d)" n
     | E_Str s -> Printf.sprintf "Str(%s)" s
-    | Plus (e1, e2) -> Printf.sprintf "Plus(%s; %s)" (string_of_e_term e1) (string_of_e_term e2)
-    | Times (e1, e2) -> Printf.sprintf "Times(%s; %s)" (string_of_e_term e1) (string_of_e_term e2)
-    | Cat (e1, e2) -> Printf.sprintf "Cat(%s; %s)" (string_of_e_term e1) (string_of_e_term e2)
-    | Len e -> Printf.sprintf "Len(%s)" (string_of_e_term e)
-    | Let (e1, x, e2) -> Printf.sprintf "Let(%s; %s.%s)" (string_of_e_term e1) x (string_of_e_term e2)
+    | E_Plus (e1, e2) -> Printf.sprintf "Plus(%s; %s)" (string_of_e_term e1) (string_of_e_term e2)
+    | E_Times (e1, e2) -> Printf.sprintf "Times(%s; %s)" (string_of_e_term e1) (string_of_e_term e2)
+    | E_Cat (e1, e2) -> Printf.sprintf "Cat(%s; %s)" (string_of_e_term e1) (string_of_e_term e2)
+    | E_Len e -> Printf.sprintf "Len(%s)" (string_of_e_term e)
+    | E_Let (e1, x, e2) -> Printf.sprintf "Let(%s; %s.%s)" (string_of_e_term e1) x (string_of_e_term e2)
 
 (** Used for all of our types. *)
 type e_type =
