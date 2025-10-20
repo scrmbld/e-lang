@@ -30,9 +30,11 @@ let rec derive_type (e : e_term) (gamma : e_type StringMap.t) : (e_type, string)
     | E_Let (e1, x, e2) -> let_type e1 x e2 gamma
     | E_Lam (t, x, e) -> lam_type t x e gamma
     | E_App (e1, e2) -> match derive_type e1 gamma with
-            | Ok (T_Arr (_, e2')) -> Ok e2'
+            | Ok (T_Arr (t1, t2')) -> (match derive_type e2 gamma with
+                | Ok t2 -> if t1 == t2 then Ok t2' else Error (Printf.sprintf "Invalid argument type: expected %s, got %s" (string_of_e_type t1) (string_of_e_type t2))
+                | err -> err)
             | Ok _ -> Error "expected arrow in app"
-            | Error s -> Error s
+            | err -> err
 
 let rec step (e : e_term) (delta : e_term StringMap.t) : ((e_term * e_term StringMap.t), string) result =
     let ident_x x delta = match StringMap.find_opt x delta with
@@ -57,8 +59,11 @@ let rec step (e : e_term) (delta : e_term StringMap.t) : ((e_term * e_term Strin
         | Ok (e2p, gp) -> Ok (E_Cat (e1, e2p), gp)
         | err -> err
     and len_e e delta = match step e delta with
-        | Ok (ep, gp) -> Ok (E_Len (ep), gp)
+        | Ok (ep, gp) -> Ok (E_Len ep, gp)
         | err -> err
+    and app e1 e2 delta = match e1 with
+        | E_Lam (_, x, e1') -> Ok (e1', (StringMap.add x e2 delta))
+        | _ -> Error (Printf.sprintf "Cannot apply a non-function")
     in match e with
         | E_Ident x -> ident_x x delta
         | E_Num n -> Ok ((E_Num n), delta)
@@ -75,6 +80,8 @@ let rec step (e : e_term) (delta : e_term StringMap.t) : ((e_term * e_term Strin
         | E_Len (E_Str s) -> Ok (E_Num (String.length s), delta)
         | E_Len e -> len_e e delta
         | E_Let (e1, x, e2) -> Ok (e2, (StringMap.add x e1 delta))
+        | E_Lam (t, x, e) -> Ok (E_Lam (t, x, e), delta)
+        | E_App (e1, e2) -> app e1 e2 delta
 
 let rec eval (e : e_term) (delta : e_term StringMap.t) : (e_term, string) result =
     let ident_x x delta = match StringMap.find_opt x delta with
@@ -102,6 +109,9 @@ let rec eval (e : e_term) (delta : e_term StringMap.t) : (e_term, string) result
         | Ok ep -> eval (E_Len ep) delta
         | Error s -> Error s
     and let_e e1 x e2 delta = eval e2 (StringMap.add x e1 delta)
+    and app e1 e2 delta = match e1 with
+        | E_Lam (_, x, e1') -> eval e1' (StringMap.add x e2 delta)
+        | _ -> Error ("expected lambda")
     in match e with
         | E_Num n -> Ok (E_Num n)
         | E_Str s -> Ok (E_Str s)
@@ -118,3 +128,5 @@ let rec eval (e : e_term) (delta : e_term StringMap.t) : (e_term, string) result
         | E_Len (E_Str s) -> Ok (E_Num (String.length s))
         | E_Len e -> len_e e delta
         | E_Let (e1, x, e2) -> let_e e1 x e2 delta
+        | E_Lam (t, x, e) -> Ok (E_Lam (t, x, e))
+        | E_App (e1, e2) -> app e1 e2 delta
