@@ -7,22 +7,32 @@ let empty_eval_context : e_term StringMap.t = StringMap.empty
 
 let rec derive_type (e : e_term) (gamma : e_type StringMap.t) : (e_type, string) result =
     let ident_type x gamma = match StringMap.find_opt x gamma with
-        | None -> Error "malformed type"
         | Some t -> Ok t
+        | None -> Error (Printf.sprintf "unrecognized identifier %s" x)
     and let_type e1 x e2 gamma =
         let x_type = derive_type e1 gamma in
             match x_type with
-                | Error s -> Error s
                 | Ok x_type -> derive_type e2 (StringMap.add x x_type gamma)
+                | Error s -> Error s
+    and lam_type t x e gamma =
+        let e_type = derive_type e (StringMap.add x t gamma) in
+            match e_type with
+                | Ok e_t -> Ok (T_Arr (t, e_t))
+                | Error s -> Error s
     in match e with
     | E_Ident x -> ident_type x gamma
     | E_Str _ -> Ok T_Str
     | E_Num _ -> Ok T_Num
-    | E_Plus (e1, e2) -> if ((derive_type e1 gamma) = Ok T_Num) && ((derive_type e2 gamma) = Ok T_Num) then Ok T_Num else Error "malformed type"
-    | E_Times (e1, e2) -> if ((derive_type e1 gamma) = Ok T_Num) && ((derive_type e2 gamma) = Ok T_Num) then Ok T_Num else Error "malformed type"
-    | E_Cat (e1, e2) -> if ((derive_type e1 gamma) = Ok T_Str) && ((derive_type e2 gamma) = Ok T_Str) then Ok T_Str else Error "malformed type"
-    | E_Len (e1) -> if (derive_type e1 gamma) = Ok T_Str then Ok T_Num else Error "malformed type"
+    | E_Plus (e1, e2) -> if ((derive_type e1 gamma) = Ok T_Num) && ((derive_type e2 gamma) = Ok T_Num) then Ok T_Num else Error "expected nat in plus"
+    | E_Times (e1, e2) -> if ((derive_type e1 gamma) = Ok T_Num) && ((derive_type e2 gamma) = Ok T_Num) then Ok T_Num else Error "expected nat in times"
+    | E_Cat (e1, e2) -> if ((derive_type e1 gamma) = Ok T_Str) && ((derive_type e2 gamma) = Ok T_Str) then Ok T_Str else Error "expected string in cat"
+    | E_Len (e1) -> if (derive_type e1 gamma) = Ok T_Str then Ok T_Num else Error "expected string in len"
     | E_Let (e1, x, e2) -> let_type e1 x e2 gamma
+    | E_Lam (t, x, e) -> lam_type t x e gamma
+    | E_App (e1, e2) -> match derive_type e1 gamma with
+            | Ok (T_Arr (_, e2')) -> Ok e2'
+            | Ok _ -> Error "expected arrow in app"
+            | Error s -> Error s
 
 let rec step (e : e_term) (delta : e_term StringMap.t) : ((e_term * e_term StringMap.t), string) result =
     let ident_x x delta = match StringMap.find_opt x delta with

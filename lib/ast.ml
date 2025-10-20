@@ -5,6 +5,13 @@ type e_ident = string
 (** Represents a type variable in our rules. The content of the string is the name of the variable. *)
 type t_ident = string
 
+(** Used for all of our types. *)
+type e_type =
+    | T_Num
+    | T_Str
+    | T_Var of e_ident           (* type variable -- useful in type derivations, but not actual programs *)
+    | T_Arr of (e_type * e_type) (* arrow type *)
+
 (** Used for all of our terms. This pulls double duty for both our rules, and representing the AST of our program. This is why it contains the "I" terms also -- these are used in instruction rules. Note that, in rules, the contents of literal terms E_Num and E_Str are used as identifiers instead of values. *)
 type e_term =
     | E_Ident of e_ident
@@ -15,6 +22,8 @@ type e_term =
     | E_Cat of (e_term * e_term)
     | E_Len of e_term
     | E_Let of (e_term * e_ident * e_term)
+    | E_Lam of (e_type * e_ident * e_term)  (* first argument is the type of the parameter *)
+    | E_App of (e_term * e_term)            (* function application *)
 
 (** Converts terms into strings to make ASTs and rules readable *)
 let rec string_of_e_term e = match e with
@@ -26,15 +35,12 @@ let rec string_of_e_term e = match e with
     | E_Cat (e1, e2) -> Printf.sprintf "Cat(%s; %s)" (string_of_e_term e1) (string_of_e_term e2)
     | E_Len e -> Printf.sprintf "Len(%s)" (string_of_e_term e)
     | E_Let (e1, x, e2) -> Printf.sprintf "Let(%s; %s.%s)" (string_of_e_term e1) x (string_of_e_term e2)
-
-(** Used for all of our types. *)
-type e_type =
-    | T_Num
-    | T_Str
-    | T_Var of e_ident
+    | E_Lam (t, x, e) -> Printf.sprintf ("\\%s -> %s") x (string_of_e_term e)
+    | E_App (e1, e2) -> Printf.sprintf ("(%s) %s") (string_of_e_term e1) (string_of_e_term e2)
 
 (** Converts types into strings to make rules readable. *)
-let string_of_e_type t = match t with
+let rec string_of_e_type t = match t with
     | T_Num -> "num"
     | T_Str -> "str"
     | T_Var t -> t
+    | T_Arr (t1, t2) -> Printf.sprintf "%s -> %s" (string_of_e_type t1) (string_of_e_type t2)
